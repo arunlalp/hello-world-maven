@@ -1,5 +1,3 @@
-Here’s your content in clean **Markdown format**:
-
 # Hello World CI/CD Project
 
 This is a simple **"Hello, World!"** web application built with Java and the SparkJava framework.  
