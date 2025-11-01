@@ -1,0 +1,126 @@
+# Patterns to ignore when building packages.
+# This supports shell glob matching, relative path matching, and
+# negation (prefixed with !). Only one pattern per line.
+
+# ==============================================================================
+# Version Control Systems
+# ==============================================================================
+.git/
+.gitignore
+.gitattributes
+.github/
+.bzr/
+.bzrignore
+.hg/
+.hgignore
+.svn/
+.gitlab-ci.yml
+
+# ==============================================================================
+# OS Generated Files
+# ==============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ==============================================================================
+# IDE and Editor Files
+# ==============================================================================
+.project
+.idea/
+*.tmproj
+.vscode/
+*.code-workspace
+.settings/
+*.iml
+*.ipr
+*.iws
+.classpath
+nbproject/
+*.swp
+*.swo
+*~
+
+# ==============================================================================
+# Backup and Temporary Files
+# ==============================================================================
+*.swp
+*.bak
+*.tmp
+*.temp
+*.orig
+*.rej
+*~.nib
+*.old
+
+# ==============================================================================
+# CI/CD Files
+# ==============================================================================
+azure-pipelines.yml
+ci-pipeline.yml
+deploy-pipeline.yml
+docker-pipeline.yml
+secure-pipeline.yml
+Jenkinsfile
+.travis.yml
+.circleci/
+
+# ==============================================================================
+# Documentation (keep Chart README)
+# ==============================================================================
+OWNERS
+OWNERS.md
+TODO.md
+NOTES.md
+docs/
+documentation/
+
+# ==============================================================================
+# Development and Testing
+# ==============================================================================
+test/
+tests/
+*.test.yaml
+*.test.yml
+examples/
+example-values.yaml
+
+# ==============================================================================
+# Helm Specific
+# ==============================================================================
+# Helm packaging
+*.tgz
+*.lock
+charts/*.tgz
+requirements.lock
+
+# Helm chart development
+values-local.yaml
+values-dev.yaml
+values-test.yaml
+values-*.local.yaml
+
+# ==============================================================================
+# Scripts and Tools
+# ==============================================================================
+*.sh
+scripts/
+tools/
+
+# ==============================================================================
+# Logs and Reports
+# ==============================================================================
+*.log
+logs/
+
+# ==============================================================================
+# Miscellaneous
+# ==============================================================================
+.helmignore
+LICENSE
+CONTRIBUTING.md

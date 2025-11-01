@@ -1,0 +1,157 @@
+# azure-pipelines.yml
+
+trigger:
+  - main
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+  autoCancel: true
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  # Project paths / names
+  projectDir: 'hello-world-maven'                  # folder with pom.xml and Dockerfile
+  imageRepository: 'hello-world-maven'             # ACR repo name
+
+  # ACR config 
+  dockerRegistryServiceConnection: 'java-maven-acr-svc'   # ACR service connection
+  acrLoginServer: 'democontainerregistry9765.azurecr.io'   
+
+  # AKS config
+  aksServiceConnection: 'java-maven-aks-svc'       # AKS service connection
+  kubernetesNamespace: 'java-maven'                   # Kubernetes namespace
+  helmReleaseName: 'hello-world-maven-release'     # Helm release name
+  # Image pull secret used to pull images from ACR (created from the ACR service connection)
+  imagePullSecretName: 'acr-secret'
+
+
+  # Docker tags
+  tags: |
+    $(Build.BuildId)
+    latest
+
+  # Maven cache dir
+  MAVEN_CACHE_DIR: '$(Pipeline.Workspace)/.m2/repository'
+
+stages:
+# 1) Build JAR with Maven and publish target/
+- stage: Build
+  displayName: Build JAR with Maven
+  jobs:
+  - job: Build
+    displayName: Maven Package
+    steps:
+    - checkout: self
+
+    - script: |
+        mkdir -p '$(MAVEN_CACHE_DIR)'
+        echo "Maven cache dir: $(MAVEN_CACHE_DIR)"
+      displayName: Ensure Maven cache folder
+
+    - task: Cache@2
+      displayName: Cache Maven repository
+      inputs:
+        key: 'maven | "$(Agent.OS)" | **/pom.xml'
+        restoreKeys: |
+          maven | "$(Agent.OS)"
+        path: '$(MAVEN_CACHE_DIR)'
+
+    # Build (skip tests to keep it fast for pipeline testing)
+    - script: |
+        cd "$(projectDir)"
+        mvn -B clean package -DskipTests -Dmaven.repo.local=$(MAVEN_CACHE_DIR) \
+          -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+      displayName: Maven package (skip tests)
+
+    # Publish the compiled target directory (JAR, etc.)
+    - task: PublishBuildArtifacts@1
+      displayName: Publish artifact (target/)
+      inputs:
+        PathtoPublish: '$(projectDir)/target'
+        ArtifactName: 'target'
+
+# 2) Build & Push Docker image to ACR
+- stage: Image
+  displayName: Build & Push Docker Image
+  dependsOn: Build
+  jobs:
+  - job: Docker
+    displayName: Docker build & push
+    steps:
+    - checkout: self
+
+    - task: Docker@2
+      displayName: Login to ACR
+      inputs:
+        command: login
+        containerRegistry: '$(dockerRegistryServiceConnection)'
+
+    # Build and push in one go
+    - task: Docker@2
+      displayName: Build & Push image
+      inputs:
+        command: buildAndPush
+        repository: '$(imageRepository)'
+        containerRegistry: '$(dockerRegistryServiceConnection)'
+        dockerfile: '$(projectDir)/Dockerfile'
+        buildContext: '$(projectDir)'
+        tags: |
+          $(tags)
+
+    - script: |
+        echo "Pushed tags:"
+        echo "$(tags)" | sed 's/^/ - /'
+        echo "Registry: $(acrLoginServer)"
+        echo "Image: $(acrLoginServer)/$(imageRepository)"
+      displayName: Show image info
+
+# 3) Deploy to AKS with Helm (minimal)
+- stage: Deploy
+  displayName: Deploy to AKS
+  dependsOn: Image
+  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+  jobs:
+  - job: HelmDeployJob
+    displayName: Helm upgrade/install
+    steps:
+    - checkout: self
+
+    - task: HelmInstaller@1
+      displayName: Install Helm
+      inputs:
+        helmVersionToInstall: 'latest'
+
+    # # Create image pull secret from your ACR service connection
+    # - task: KubernetesManifest@1
+    #   displayName: Create ACR pull secret
+    #   inputs:
+    #     action: 'createSecret'
+    #     secretType: 'dockerRegistry'
+    #     secretName: '$(imagePullSecretName)'
+    #     dockerRegistryEndpoint: '$(dockerRegistryServiceConnection)'
+    #     kubernetesServiceConnection: '$(aksServiceConnection)'
+    #     namespace: '$(kubernetesNamespace)'
+
+    - task: HelmDeploy@0
+      displayName: Helm upgrade --install
+      inputs:
+        connectionType: 'Kubernetes Service Connection'
+        kubernetesServiceConnection: '$(aksServiceConnection)'
+        namespace: '$(kubernetesNamespace)'
+        command: 'upgrade'
+        chartType: 'FilePath'
+        chartPath: '$(projectDir)/helm-chart'
+        releaseName: '$(helmReleaseName)'
+        arguments: >
+          --install
+          --set-string image.repository=$(acrLoginServer)/$(imageRepository)
+          --set-string image.tag=$(Build.BuildId)
+          --set imagePullSecrets[0].name=$(imagePullSecretName)
+          -f $(projectDir)/helm-chart/values-acr.yaml
+          --wait
+          --timeout=10m

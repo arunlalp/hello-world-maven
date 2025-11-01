@@ -1,0 +1,164 @@
+# Git files
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+*.code-workspace
+nbproject/
+
+# Build outputs (include what's needed for runtime)
+target/
+!target/*.jar
+!target/*.war
+build/
+out/
+*.class
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Test reports and coverage
+junit/
+jacoco.xml
+jacoco.exec
+*.exec
+coverage/
+surefire-reports/
+site/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+*.orig
+*.rej
+
+# Maven specific
+.mvn/wrapper/maven-wrapper.jar
+.mvn/timing.properties
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+
+# Documentation that doesn't need to be in image
+README.md
+*.md
+!RELEASE_NOTES.md
+LICENSE
+docs/
+documentation/
+
+# CI/CD files
+azure-pipelines.yml
+ci-pipeline.yml
+deploy-pipeline.yml
+docker-pipeline.yml
+secure-pipeline.yml
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+.circleci/
+
+# Helm charts (if not needed in container)
+helm-chart/
+charts/
+*.tgz
+
+# Test files (exclude from production image)
+src/test/
+**/test/
+**/*Test.java
+**/*Tests.java
+
+# Development scripts
+*.sh
+!docker-entrypoint.sh
+validate-deployment.sh
+setup-azure-resources.sh
+setup-branch-protection.sh
+quick-test.sh
+security-fix-helper.sh
+test-trivy-logic.sh
+
+# Security scanning files
+dependency-check-suppressions.xml
+.trivyignore
+trivy-report.*
+dependency-check-report.*
+
+# Environment and config files
+.env
+.env.*
+!.env.example
+*.properties
+!application.properties
+*.yml
+!application*.yml
+*.yaml
+!application*.yaml
+
+# Azure DevOps
+.azure/
+
+# Docker files
+.dockerignore
+Dockerfile.dev
+docker-compose*.yml
+.docker/
+
+# Kubernetes files
+*.kubeconfig
+k8s/
+kubernetes/
+
+# Cache directories
+.cache/
+.npm/
+.m2/
+
+# Node modules (if any)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Python (if any)
+__pycache__/
+*.py[cod]
+*.so
+.Python
+venv/
+ENV/
+*.egg-info/
+
+# Miscellaneous
+demo.txt
+TODO.md
+NOTES.md

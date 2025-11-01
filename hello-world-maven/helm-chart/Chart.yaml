@@ -1,0 +1,20 @@
+apiVersion: v2
+name: hello-world-maven
+description: A Helm chart for Hello World Maven Java application with SparkJava and Prometheus metrics
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+home: https://github.com/example/hello-world-maven
+sources:
+  - https://github.com/example/hello-world-maven
+maintainers:
+  - name: Your Name
+    email: your.email@example.com
+keywords:
+  - java
+  - maven
+  - sparkjava
+  - prometheus
+  - web
+annotations:
+  category: Application

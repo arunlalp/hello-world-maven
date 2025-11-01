@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+    <!-- 
+    Example suppression rules for known false positives
+    Uncomment and modify as needed for your specific dependencies
+    
+    <suppress>
+        <notes><![CDATA[
+        Suppress false positive for SparkJava framework
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/com\.sparkjava/spark\-core@.*$</packageUrl>
+        <cve>CVE-YYYY-NNNN</cve>
+    </suppress>
+    -->
+    
+    <!-- Example: Suppress development-only dependencies -->
+    <!--
+    <suppress>
+        <notes><![CDATA[
+        Development and test dependencies that don't impact production
+        ]]></notes>
+        <gav regex="true">.*:.*:.*:.*:(test|provided)</gav>
+    </suppress>
+    -->
+</suppressions>

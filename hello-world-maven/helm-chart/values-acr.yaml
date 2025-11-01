@@ -1,0 +1,58 @@
+# Azure Container Registry (ACR) example values
+# This file shows how to configure the chart to use images from ACR
+
+# ACR image configuration
+image:
+  repository: your-acr-name.azurecr.io/hello-world-maven
+  tag: "latest"
+  pullPolicy: Always
+
+# Image pull secrets for ACR authentication
+imagePullSecrets:
+  - name: acr-secret
+
+# Basic service configuration
+service:
+  type: NodePort
+  port: 80
+
+# Enable ingress for external access
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts:
+    - host: hello-world-maven.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+# Resource configuration for AKS
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+# Enable monitoring
+monitoring:
+  enabled: false
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+
+# AKS-specific configurations
+nodeSelector:
+  kubernetes.io/os: linux
+
+# Tolerations for system node pools (if needed)
+tolerations: []
+
+# Pod disruption budget for high availability
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

@@ -1,0 +1,54 @@
+# Trivy ignore file for suppressing known false positives or accepted risks
+# Format: CVE-YYYY-NNNN or vulnerability ID
+# 
+# IMPORTANT: Only add entries here after proper security review and approval
+# Each entry MUST have a comment explaining:
+# - Why it's acceptable
+# - Date added
+# - Added by whom
+# - Review date / expiry
+
+# ==============================================================================
+# Alpine Base Image Vulnerabilities
+# ==============================================================================
+# Example: Alpine package manager vulnerabilities that are false positives
+# CVE-2023-5363  # libxml2 - false positive for our use case, added 2024-01-15
+# CVE-2023-4641  # shadow-utils - not applicable in container context, added 2024-01-15
+
+# ==============================================================================
+# OpenJDK/JRE Vulnerabilities
+# ==============================================================================
+# Add specific CVEs here after security team review
+# Format: CVE-YYYY-NNNN
+# Example:
+# CVE-2024-XXXXX  # JDK vulnerability - mitigation applied at runtime, added 2024-XX-XX
+
+# ==============================================================================
+# Third-Party Library Vulnerabilities
+# ==============================================================================
+# Add vulnerabilities from Maven dependencies that have been reviewed and accepted
+# Example:
+# CVE-2024-XXXXX  # commons-io - vulnerability not exploitable in our context, added 2024-XX-XX
+
+# ==============================================================================
+# Known False Positives
+# ==============================================================================
+# Add false positives reported by Trivy scanner
+# Example:
+# CVE-2024-XXXXX  # False positive - feature not used, added 2024-XX-XX
+
+# ==============================================================================
+# Accepted Risks (Requires Management Approval)
+# ==============================================================================
+# Add CVEs that represent accepted business risks
+# Example:
+# CVE-2024-XXXXX  # Accepted risk - fix scheduled for Q1 2025, approved by CISO, added 2024-XX-XX
+
+# ==============================================================================
+# Notes:
+# ==============================================================================
+# - Review this file monthly to remove outdated entries
+# - All entries should have an expiry/review date
+# - Critical and High severity CVEs should rarely be ignored
+# - Document mitigation strategies for ignored vulnerabilities
+# - Keep a separate security register for audit purposes

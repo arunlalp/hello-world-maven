@@ -1,0 +1,280 @@
+trigger:
+  - main
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+  autoCancel: true
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  # Project paths / names
+  projectDir: 'hello-world-maven'
+  imageRepository: 'hello-world-maven'
+
+  # ACR config 
+  dockerRegistryServiceConnection: 'java-maven-acr-svc'
+  acrLoginServer: 'democontainerregistry9765.azurecr.io'
+
+  # AKS config
+  aksServiceConnection: 'java-maven-aks-svc'
+  kubernetesNamespace: 'java-maven'
+  helmReleaseName: 'hello-world-maven-release'
+  imagePullSecretName: 'acr-secret'
+
+  # Docker tags
+  tags: |
+    $(Build.BuildId)
+    latest
+
+  # Maven cache dir
+  MAVEN_CACHE_DIR: '$(Pipeline.Workspace)/.m2/repository'
+
+stages:
+# 1) Security Scan: Dependencies
+- stage: SecurityScanDeps
+  displayName: Security Scan Dependencies
+  jobs:
+  - job: OWASP
+    displayName: OWASP Dependency Check
+    steps:
+    - checkout: self
+
+    - script: |
+        mkdir -p '$(MAVEN_CACHE_DIR)'
+      displayName: Ensure Maven cache folder
+
+    - task: Cache@2
+      displayName: Cache Maven repository
+      inputs:
+        key: 'maven | "$(Agent.OS)" | **/pom.xml'
+        restoreKeys: |
+          maven | "$(Agent.OS)"
+        path: '$(MAVEN_CACHE_DIR)'
+
+    # Run OWASP Dependency Check
+    - script: |
+        cd "$(projectDir)"
+        mvn org.owasp:dependency-check-maven:check \
+          -DskipProvidedScope=true \
+          -DskipSystemScope=true \
+          -DsuppressionFiles=dependency-check-suppressions.xml
+      displayName: OWASP Dependency Check
+
+    # Publish OWASP report
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathToPublish: '$(projectDir)/target/dependency-check-report.html'
+        artifactName: 'dependency-check-report'
+
+# 2) Build JAR with Maven and run tests
+- stage: Build
+  displayName: Build and Test
+  dependsOn: SecurityScanDeps
+  jobs:
+  - job: Build
+    displayName: Maven Build
+    steps:
+    - checkout: self
+
+    - script: |
+        mkdir -p '$(MAVEN_CACHE_DIR)'
+      displayName: Ensure Maven cache folder
+
+    - task: Cache@2
+      displayName: Cache Maven repository
+      inputs:
+        key: 'maven | "$(Agent.OS)" | **/pom.xml'
+        restoreKeys: |
+          maven | "$(Agent.OS)"
+        path: '$(MAVEN_CACHE_DIR)'
+
+    # Build and run tests
+    - script: |
+        cd "$(projectDir)"
+        mvn -B clean verify -Dmaven.repo.local=$(MAVEN_CACHE_DIR) \
+          -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+      displayName: Maven build and test
+
+    # Publish test results
+    - task: PublishTestResults@2
+      inputs:
+        testResultsFormat: 'JUnit'
+        testResultsFiles: '**/TEST-*.xml'
+        searchFolder: '$(projectDir)'
+        mergeTestResults: true
+        failTaskOnFailedTests: true
+
+    # Publish code coverage
+    - task: PublishCodeCoverageResults@1
+      inputs:
+        codeCoverageTool: 'JaCoCo'
+        summaryFileLocation: '$(projectDir)/target/site/jacoco/jacoco.xml'
+        reportDirectory: '$(projectDir)/target/site/jacoco'
+
+    # Publish compiled artifacts
+    - task: PublishBuildArtifacts@1
+      displayName: Publish artifact (target/)
+      inputs:
+        PathtoPublish: '$(projectDir)/target'
+        ArtifactName: 'target'
+
+# 3) Build & Push Docker image with security scans
+- stage: Image
+  displayName: Build & Scan Docker Image
+  dependsOn: Build
+  jobs:
+  - job: Docker
+    displayName: Docker build, scan & push
+    steps:
+    - checkout: self
+
+    # Install Trivy scanner
+    - script: |
+        sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+        wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+        echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
+        sudo apt-get update
+        sudo apt-get install -y trivy
+      displayName: Install Trivy
+
+    - task: Docker@2
+      displayName: Login to ACR
+      inputs:
+        command: login
+        containerRegistry: '$(dockerRegistryServiceConnection)'
+
+    # Build image
+    - task: Docker@2
+      displayName: Build image
+      inputs:
+        command: build
+        repository: '$(imageRepository)'
+        containerRegistry: '$(dockerRegistryServiceConnection)'
+        dockerfile: '$(projectDir)/Dockerfile'
+        buildContext: '$(projectDir)'
+        tags: |
+          $(tags)
+
+    # Run Trivy scan
+    - script: |
+        trivy image --exit-code 1 --severity HIGH,CRITICAL $(acrLoginServer)/$(imageRepository):$(Build.BuildId)
+      displayName: Scan container image with Trivy
+      
+    # Push image if scans pass
+    - task: Docker@2
+      displayName: Push image
+      inputs:
+        command: push
+        repository: '$(imageRepository)'
+        containerRegistry: '$(dockerRegistryServiceConnection)'
+        tags: |
+          $(tags)
+
+# 4) Security Scan: Infrastructure
+- stage: SecurityScanInfra
+  displayName: Security Scan Infrastructure
+  dependsOn: Image
+  jobs:
+  - job: Checkov
+    displayName: Scan IaC with Checkov
+    steps:
+    - checkout: self
+
+    # Install Checkov
+    - script: |
+        python -m pip install --upgrade pip
+        pip install checkov
+      displayName: Install Checkov
+
+    # Scan Helm charts and Kubernetes manifests
+    - script: |
+        checkov -d $(projectDir)/helm-chart --framework kubernetes
+      displayName: Scan Helm charts with Checkov
+
+    # Optional: Scan Terraform if present
+    - script: |
+        if [ -d "terraform" ]; then
+          checkov -d terraform
+        fi
+      displayName: Scan Terraform with Checkov
+      continueOnError: true
+
+# 5) Deploy to AKS with security contexts
+- stage: Deploy
+  displayName: Secure Deploy to AKS
+  dependsOn: SecurityScanInfra
+  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+  jobs:
+  - deployment: Deploy
+    displayName: Deploy to AKS
+    environment: 'production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+
+          - task: HelmInstaller@1
+            displayName: Install Helm
+            inputs:
+              helmVersionToInstall: 'latest'
+
+          # Run Kubesec scan on rendered templates
+          - script: |
+              helm template $(projectDir)/helm-chart \
+                --set-string image.repository=$(acrLoginServer)/$(imageRepository) \
+                --set-string image.tag=$(Build.BuildId) \
+                --set imagePullSecrets[0].name=$(imagePullSecretName) \
+                -f $(projectDir)/helm-chart/values-prod.yaml > rendered-manifests.yaml
+              
+              curl -sSL https://kubesec.io/get | sh
+              kubesec scan rendered-manifests.yaml
+            displayName: Scan Kubernetes manifests with Kubesec
+
+          - task: HelmDeploy@0
+            displayName: Helm upgrade --install
+            inputs:
+              connectionType: 'Kubernetes Service Connection'
+              kubernetesServiceConnection: '$(aksServiceConnection)'
+              namespace: '$(kubernetesNamespace)'
+              command: 'upgrade'
+              chartType: 'FilePath'
+              chartPath: '$(projectDir)/helm-chart'
+              releaseName: '$(helmReleaseName)'
+              arguments: >
+                --install
+                --set-string image.repository=$(acrLoginServer)/$(imageRepository)
+                --set-string image.tag=$(Build.BuildId)
+                --set imagePullSecrets[0].name=$(imagePullSecretName)
+                -f $(projectDir)/helm-chart/values-prod.yaml
+                --atomic
+                --wait
+                --timeout=10m
+
+# 6) Post-deployment Security Scan
+- stage: PostDeploymentScan
+  displayName: Post-deployment Security Scan
+  dependsOn: Deploy
+  jobs:
+  - job: KubeSecurityScan
+    displayName: Kubernetes Security Scan
+    steps:
+    - checkout: self
+
+    # Install and run kube-hunter
+    - script: |
+        pip install kube-hunter
+        kube-hunter --remote $(acrLoginServer) --report json --report-path kube-hunter-report.json
+      displayName: Run kube-hunter scan
+      continueOnError: true
+
+    # Publish security scan results
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathToPublish: 'kube-hunter-report.json'
+        artifactName: 'security-scan-results'
